@@ -4,7 +4,7 @@ A client-side Fabric mod project for Minecraft Java Edition 1.21, with PojavLaun
 
 ## Project status
 
-Initial repository setup. The first milestone is a clean, reproducible Java 21 + Fabric build that can be tested in a local world.
+Initial repository setup. The first milestone is a reproducible Java 21 + Fabric build for local-world testing.
 
 ## Development scope
 
@@ -17,13 +17,13 @@ This project does not implement anti-cheat evasion or hidden combat automation f
 
 ## Build
 
-Use JDK 21 and Gradle. Once the Gradle project files are added, run:
+Install JDK 21 and Gradle, then run:
 
 ```bash
-./gradlew build
+gradle build
 ```
 
-The mod JAR will be produced in `build/libs/`.
+The mod JAR will be produced in `build/libs/`. GitHub Actions also runs the build on pushes and pull requests.
 
 ## Testing
 
