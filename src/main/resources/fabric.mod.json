@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "prestige_silentaim",
+  "version": "${version}",
+  "name": "Prestige SilentAim",
+  "description": "A client-side Fabric project focused on UI and local rotation diagnostics.",
+  "authors": ["Kartik"],
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "dev.prestige.client.PrestigeClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.5",
+    "minecraft": "~1.21",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
