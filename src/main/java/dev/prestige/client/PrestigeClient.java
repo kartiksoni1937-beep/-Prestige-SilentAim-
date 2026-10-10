@@ -5,25 +5,26 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.util.InputUtil;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.text.Text;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.client.util.InputUtil;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Computes a separate, hypothetical target rotation for controlled testing.
- * It never changes camera/player angles and never modifies outgoing packets.
+ * Local-only rotation preview for testing target-angle calculations.
+ * It does not rotate the player/camera or alter attack packets.
  */
 public final class PrestigeClient implements ClientModInitializer {
     public static final String MOD_ID = "prestige_silentaim";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
     private static KeyBinding toggleKey;
-    private static boolean diagnosticsEnabled;
-    private static int lastLoggedTick = -1;
+    private static boolean previewEnabled;
+    private static int lastPreviewTick = -1;
 
     @Override
     public void onInitializeClient() {
@@ -34,40 +35,54 @@ public final class PrestigeClient implements ClientModInitializer {
                 "category.prestige_silentaim"
         ));
         ClientTickEvents.END_CLIENT_TICK.register(PrestigeClient::onClientTick);
-        LOGGER.info("Prestige rotation calculator initialized. Press G to toggle diagnostics.");
+        LOGGER.info("Prestige rotation preview initialized. Press G to toggle.");
     }
 
     private static void onClientTick(MinecraftClient client) {
         while (toggleKey.wasPressed()) {
-            diagnosticsEnabled = !diagnosticsEnabled;
-            lastLoggedTick = -1;
-            LOGGER.info("Rotation diagnostics {}", diagnosticsEnabled ? "enabled" : "disabled");
+            previewEnabled = !previewEnabled;
+            lastPreviewTick = -1;
+            if (client.player != null) {
+                client.player.sendMessage(Text.literal(
+                        "Rotation preview " + (previewEnabled ? "enabled" : "disabled")
+                ), true);
+            }
+            LOGGER.info("Rotation preview {}", previewEnabled ? "enabled" : "disabled");
         }
 
-        if (!diagnosticsEnabled || client.player == null || client.world == null
+        if (!previewEnabled || client.player == null || client.world == null
                 || client.currentScreen != null || !client.options.attackKey.isPressed()) {
+            return;
+        }
+        if (lastPreviewTick == client.player.age) {
             return;
         }
 
         LivingEntity target = findTarget(client);
-        if (target == null || lastLoggedTick == client.player.age) {
+        if (target == null) {
+            client.player.sendMessage(Text.literal("Rotation preview: no visible target in range"), true);
+            lastPreviewTick = client.player.age;
             return;
         }
 
-        // Separate calculated state: these values are for diagnostics only.
         Vec3d delta = target.getEyePos().subtract(client.player.getEyePos());
         double horizontal = Math.sqrt(delta.x * delta.x + delta.z * delta.z);
-        float calculatedYaw = (float) (Math.atan2(delta.z, delta.x) * 180.0 / Math.PI) - 90.0F;
-        float calculatedPitch = (float) -(Math.atan2(delta.y, horizontal) * 180.0 / Math.PI);
-        float yawDelta = MathHelper.wrapDegrees(calculatedYaw - client.player.getYaw());
-        float pitchDelta = calculatedPitch - client.player.getPitch();
+        float targetYaw = (float) (Math.atan2(delta.z, delta.x) * 180.0 / Math.PI) - 90.0F;
+        float targetPitch = (float) -(Math.atan2(delta.y, horizontal) * 180.0 / Math.PI);
+        float yawDelta = MathHelper.wrapDegrees(targetYaw - client.player.getYaw());
+        float pitchDelta = targetPitch - client.player.getPitch();
+        double distance = client.player.distanceTo(target);
 
-        LOGGER.info("Rotation diagnostic target={} distance={} cameraYaw={} cameraPitch={} calculatedYaw={} calculatedPitch={} yawDelta={} pitchDelta={}",
-                target.getName().getString(),
-                String.format(java.util.Locale.ROOT, "%.2f", client.player.distanceTo(target)),
-                client.player.getYaw(), client.player.getPitch(),
-                calculatedYaw, calculatedPitch, yawDelta, pitchDelta);
-        lastLoggedTick = client.player.age;
+        client.player.sendMessage(Text.literal(String.format(
+                java.util.Locale.ROOT,
+                "ROTATION PREVIEW | %s | %.1fm | target yaw %.1f pitch %.1f | delta %.1f / %.1f",
+                target.getName().getString(), distance, targetYaw, targetPitch, yawDelta, pitchDelta
+        )), true);
+
+        LOGGER.info("Rotation preview target={} distance={} cameraYaw={} cameraPitch={} targetYaw={} targetPitch={} yawDelta={} pitchDelta={}",
+                target.getName().getString(), distance, client.player.getYaw(), client.player.getPitch(),
+                targetYaw, targetPitch, yawDelta, pitchDelta);
+        lastPreviewTick = client.player.age;
     }
 
     private static LivingEntity findTarget(MinecraftClient client) {
